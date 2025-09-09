@@ -1,0 +1,74 @@
+// reserveEntry.js
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import crypto from "crypto";
+
+const sqs = new SQSClient({ region: process.env.AWS_REGION || "us-east-1" });
+const QUEUE_URL = process.env.QUEUE_URL; // cần cấu hình trong Lambda env
+
+const headers = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "OPTIONS,POST",
+  "Content-Type": "application/json",
+};
+const resp = (status, body) => ({ statusCode: status, headers, body: JSON.stringify(body) });
+
+export const handler = async (event = {}) => {
+  if (event.httpMethod === "OPTIONS") return resp(200, {});
+  if (event.httpMethod && event.httpMethod !== "POST")
+    return resp(405, { error: "MethodNotAllowed" });
+
+  let body = {};
+  try {
+    body = JSON.parse(event.body || "{}");
+  } catch {
+    return resp(400, { error: "InvalidJSON" });
+  }
+
+  const email       = String(body.email || "").trim().toLowerCase();
+  const ticket_type = String(body.ticket_type || "").trim();
+  const full_name   = String(body.full_name || body.name || "").trim();
+  const dob         = String(body.dob || "").trim();
+  const cccd_raw    = String(body.cccd || "").replace(/\s+/g, "");
+
+  // ✅ Validation cơ bản
+  const errors = {};
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Email không hợp lệ.";
+  if (!ticket_type) errors.ticket_type = "Thiếu loại vé.";
+  if (full_name.length < 2) errors.full_name = "Tên quá ngắn.";
+  if (!dob || isNaN(Date.parse(dob))) errors.dob = "Ngày sinh không hợp lệ.";
+  if (!/^\d{9}$/.test(cccd_raw) && !/^\d{12}$/.test(cccd_raw))
+    errors.cccd = "CCCD phải gồm 9 hoặc 12 số.";
+  if (Object.keys(errors).length) return resp(400, { error: "ValidationError", errors });
+
+  const order_id   = crypto.randomUUID();
+  const created_at = new Date().toISOString();
+
+  const message = {
+    order_id,
+    created_at,
+    email,
+    ticket_type,
+    quantity: 1,
+    status: "pending",
+    full_name,
+    dob,
+    cccd: cccd_raw,
+  };
+
+  // ✅ Push message vào SQS
+  await sqs.send(
+    new SendMessageCommand({
+      QueueUrl: QUEUE_URL,
+      MessageBody: JSON.stringify(message),
+      MessageGroupId: ticket_type, // FIFO theo loại vé
+      MessageDeduplicationId: order_id,
+    })
+  );
+
+  return resp(200, {
+    message: "Order received, processing...",
+    order_id,
+    status: "pending",
+  });
+};
