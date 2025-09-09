@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Concert Ticket Booking</title>
+  <style>
+    :root { --header-h: 68px; --maxw: 1200px; }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: #0c0c0f; color: #eee; }
+
+    /* ===== Header ===== */
+    header {
+      position: fixed; inset: 0 0 auto 0; height: var(--header-h);
+      background: rgba(0,0,0,.85); border-bottom: 1px solid rgba(255,255,255,.06);
+      backdrop-filter: saturate(160%) blur(6px); z-index: 1000;
+    }
+    .inner {
+      max-width: var(--maxw); margin: 0 auto; padding: 0 24px; height: 100%;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { color: #ff3b3b; font-weight: 800; font-size: 22px; letter-spacing: .3px; }
+    nav { display: flex; align-items: center; gap: 24px; }
+    nav a { color: #e9e9ea; text-decoration: none; font-weight: 700; opacity: .9; }
+    nav a:hover { color: #ff3b3b; }
+    .btn-register {
+      margin-left: 12px; padding: 10px 16px; border-radius: 8px;
+      background: linear-gradient(45deg,#ff3b3b,#a61212); color:#fff; text-decoration:none; font-weight:800;
+      box-shadow: 0 6px 20px rgba(255,59,59,.25);
+    }
+
+    /* ===== Hero ===== */
+    .hero {
+      min-height: calc(100vh - var(--header-h)); padding-top: var(--header-h);
+      display: grid; place-items: center; text-align: center; color: #fff;
+      background:
+        linear-gradient(140deg, rgba(13,26,61,.75), rgba(7,10,22,.85)),
+        url('https://images.unsplash.com/photo-1518972559570-7cc1309f3229?q=80&w=2000&auto=format&fit=crop') center/cover no-repeat;
+    }
+    .hero h1 { font-size: clamp(32px, 6vw, 68px); margin: 0 0 10px; text-shadow: 0 6px 32px rgba(0,0,0,.6); }
+    .hero p  { opacity: .92; margin: 0; }
+
+    /* ===== Section common ===== */
+    .section { max-width: var(--maxw); margin: 0 auto; padding: 64px 24px; }
+    .section h2 { margin: 0 0 24px; font-size: clamp(22px, 3.2vw, 32px); }
+    #highlight, #artists, #timeline, #register, #contact { scroll-margin-top: calc(var(--header-h) + 16px); }
+
+    /* ===== NỔI BẬT ===== */
+    .pill-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .pill {
+      background: linear-gradient(180deg,#5c2d2d,#3a2727);
+      border: 1px solid rgba(255,255,255,.15); color:#fff;
+      border-radius: 18px; padding: 18px 22px; text-align: center;
+      box-shadow: 0 16px 40px rgba(255,120,90,.12);
+    }
+    .pill h3 { margin: 2px 0 6px; letter-spacing:.3px; }
+    .pill small { opacity: .9; }
+
+    .features { margin-top: 36px; display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+    .feature {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px; padding: 22px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .feature h4 { margin: 10px 0 6px; }
+
+    /* ===== NGHỆ SĨ ===== */
+    .artists-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 18px; }
+    .artist {
+      position: relative; overflow: hidden; border-radius: 14px;
+      background: #121319; border: 1px solid #222436; height: 280px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.28);
+    }
+    .artist .thumb { position:absolute; inset:0; background:
+        linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,.15)),
+        url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1600&auto=format&fit=crop') center/cover no-repeat; }
+    .artist .label { position:absolute; left:0; right:0; bottom:10px; padding:10px 14px; text-align:center;
+      font-weight:800; letter-spacing:.3px; color:#fff; text-shadow:0 3px 14px #000; }
+
+    /* ===== TIMELINE ===== */
+    .timeline-wrap { display: grid; grid-template-columns: 240px 1fr; gap: 16px; align-items: start; }
+    .timeline-left { border-left: 3px solid #d33; padding-left: 16px; }
+    .timeline-left .title { font-weight: 800; text-transform: uppercase; }
+    .tcard {
+      background: #2c2f3a; color:#eee; border-radius: 16px; border: 1px solid #3d4050;
+      padding: 18px 20px; box-shadow: 0 12px 36px rgba(0,0,0,.35);
+    }
+    .tcard .time { font-weight: 800; opacity: .9; margin-bottom: 6px; }
+    .tcard ul { margin: 8px 0 0 18px; line-height: 1.6; }
+
+    /* ===== REGISTER ===== */
+    .block { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px; padding: 28px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    .tickets { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 16px; margin-bottom: 18px; }
+    .ticket { position: relative; padding: 16px; border-radius: 12px; cursor: pointer;
+      background: #121319; border: 1px solid #222436; transition: .2s ease; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
+    .ticket:hover { transform: translateY(-3px); border-color: #3640ff55; }
+    .ticket input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .ticket h3 { margin: 8px 0 6px; color: #a7b3ff; }
+    .muted { color: #b8b8c7; font-size: 14px; }
+    .ticket.active { border-color:#6c63ff; box-shadow: 0 0 0 3px #6c63ff33, 0 14px 28px rgba(108,99,255,.35); }
+    .ticket:has(input:checked) { border-color:#6c63ff; box-shadow: 0 0 0 3px #6c63ff33, 0 14px 28px rgba(108,99,255,.35); }
+
+    .form { display: grid; gap: 14px; margin-top: 10px; grid-template-columns: 1fr 1fr; }
+    .form .full { grid-column: 1 / -1; }
+
+    .field { position: relative; }
+    .field label { display:block; margin: 0 0 6px 4px; color:#cfcfe4; font-size:14px; }
+    .field input[type="text"], .field input[type="email"], .field input[type="date"] {
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #2a2d44;
+      background:#11131b; color:#eaeaf4; outline:none; transition: .15s;
+    }
+    .field input:focus { border-color:#5a6bff; box-shadow: 0 0 0 3px #5a6bff22; }
+    .field.invalid input { border-color:#ff4d4f; box-shadow: 0 0 0 3px #ff4d4f26; }
+    .err { position: absolute; bottom: -18px; left: 4px; font-size: 12px; color: #ff7375; display: none; }
+    .field.invalid .err { display: block; }
+
+    .btn-primary { width: 100%; padding: 14px 18px; border:none; border-radius:10px;
+      background: linear-gradient(45deg,#6c63ff,#4f46e5); color:#fff; font-weight:800; cursor:pointer;
+      box-shadow:0 12px 30px #4f46e540; transition:.2s; }
+    .btn-primary[disabled] { opacity:.7; cursor: not-allowed; }
+
+    /* Toast / server message */
+    .toast { display:none; margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+    .toast.err { display:block; background: #3b1214; border: 1px solid #8f1e23; color:#ffc9cb; }
+    .toast.ok  { display:block; background: #11341b; border: 1px solid #1c7a37; color:#c6ffd7; }
+
+    .server-msg {
+      margin-top: 14px; padding: 14px; border-radius: 12px;
+      background:#171925; border:1px solid #2f3452;
+    }
+    .server-msg h4 { margin: 0 0 6px; }
+    .server-msg .dim { color:#aeb2c9; }
+    .server-actions { margin-top: 10px; display:flex; gap:10px; }
+    .btn-ghost {
+      background: transparent; border:1px solid #3a3f68; color:#d7dbff;
+      padding: 10px 14px; border-radius:10px; cursor:pointer;
+    }
+    .btn-pay { padding:12px 18px; border:none; border-radius:10px; cursor:pointer;
+      background: linear-gradient(45deg,#ff4d8d,#ff1761); color:#fff; font-weight:800; box-shadow:0 12px 30px #ff176233; }
+
+    /* Payment / Result */
+    .center { text-align:center; }
+    .order-badge { display:inline-block; padding:10px 14px; margin:16px 0 6px; border-radius:10px;
+      font-family:monospace; letter-spacing:.4px; background: linear-gradient(135deg,#6a11cb,#2575fc); color:#fff;
+      box-shadow: 0 10px 24px rgba(37,117,252,.25); user-select: all; }
+    .status-icon { font-size:52px; margin: 6px 0 10px; }
+    .info { max-width:520px; margin:14px auto 0; background:#0f1118; border:1px solid #23263c; border-radius:12px;
+      padding:16px 18px; line-height:1.65; }
+    .row { display:flex; gap:10px; }
+    .row strong { min-width:150px; color:#cfd2ff; }
+    .ok { color:#9dffa3; } .bad { color:#ff9898; }
+    .hidden { display: none; }
+
+    /* ===== LIÊN HỆ ===== */
+    .contact-wrap {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.2);
+      padding: 28px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    }
+    .contact-left h3, .contact-right h3 { margin: 6px 0 14px; letter-spacing:.3px; }
+    .contact-left p { color:#d8d8de; line-height:1.7; }
+    .contact-input {
+      width:100%; padding:14px 16px; border-radius:12px; border:1px solid #2b2d3f;
+      background:#0e1018; color:#eaeaf4;
+    }
+    .map-card {
+      background:#1a1d26; border:1px solid #303345; border-radius:14px; padding:10px;
+      position: relative; height: 300px; overflow: hidden;
+    }
+    .map-thumb { position:absolute; inset:0; filter: grayscale(50%) contrast(95%); opacity:.8;
+      background: url('https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1600&auto=format&fit=crop') center/cover no-repeat; }
+    .map-overlay {
+      position:absolute; left:16px; bottom:16px; right:16px;
+      background: linear-gradient(180deg,#2a2d37,#1e2029); color:#fff; padding:12px 14px;
+      border-radius:12px; border:1px solid #3a3e52; box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+    .btn-road { margin-top:10px; display:inline-block; padding:10px 14px; border-radius:10px;
+      background: linear-gradient(45deg,#ff3b3b,#a61212); color:#fff; text-decoration:none; font-weight:800; }
+
+    footer { text-align: center; padding: 32px 24px; color:#9a9cb5; border-top:1px solid #1b1d2b; }
+
+    @media (max-width: 900px) {
+      .pill-row, .features { grid-template-columns: 1fr; }
+      .contact-wrap { grid-template-columns: 1fr; }
+      .form { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header>
+    <div class="inner">
+      <div class="brand">Rock Concert</div>
+      <nav>
+        <a href="#highlight">Nổi bật</a>
+        <a href="#artists">Nghệ sĩ</a>
+        <a href="#timeline">Timeline</a>
+        <a href="#contact">Liên hệ</a>
+        <a href="#register" class="btn-register">Đăng ký</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== Hero ===== -->
+  <section class="hero" id="hero">
+    <div>
+      <h1>🎵 Concert Ticket Booking</h1>
+      <p>Đặt vé online nhanh chóng & an toàn</p>
+    </div>
+  </section>
+
+  <!-- ===== NỔI BẬT ===== -->
+  <section id="highlight" class="section">
+    <h2 style="text-align:center">NỔI BẬT</h2>
+
+    <div class="pill-row">
+      <div class="pill">
+        <h3>THỜI GIAN</h3>
+        <small>07.09.2025 | 20:00 – 23:00</small>
+      </div>
+      <div class="pill">
+        <h3>ĐỊA ĐIỂM</h3>
+        <small>Khu di tích Hoàng Thành Thăng Long</small>
+      </div>
+      <div class="pill">
+        <h3>HÌNH THỨC</h3>
+        <small>Live Concert</small>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <h4>🎟️ Vé vào cửa MIỄN PHÍ</h4>
+        <p>Đăng ký online, nhận vé điện tử qua email. Số lượng giới hạn.</p>
+      </div>
+      <div class="feature">
+        <h4>🥁 Nghệ sĩ rock NỔI TIẾNG</h4>
+        <p>Sân khấu bùng nổ với lineup các ban nhạc được yêu thích nhất.</p>
+      </div>
+      <div class="feature">
+        <h4>🔊 Âm thanh SỐNG ĐỘNG</h4>
+        <p>Âm thanh – ánh sáng chuẩn lễ hội hoành tráng.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== NGHỆ SĨ ===== -->
+  <section id="artists" class="section">
+    <h2 style="text-align:center">NGHỆ SĨ</h2>
+    <div class="artists-grid">
+      <div class="artist"><div class="thumb"></div><div class="label">Bức Tường</div></div>
+      <div class="artist"><div class="thumb"></div><div class="label">Chillies</div></div>
+      <div class="artist"><div class="thumb"></div><div class="label">Phạm Anh Khoa</div></div>
+      <div class="artist"><div class="thumb"></div><div class="label">The Flob</div></div>
+      <div class="artist"><div class="thumb"></div><div class="label">Blue Whales</div></div>
+      <div class="artist"><div class="thumb"></div><div class="label">Thanh Âm Xanh</div></div>
+    </div>
+  </section>
+
+  <!-- ===== TIMELINE ===== -->
+  <section id="timeline" class="section">
+    <h2 style="text-align:center">TIMELINE – MỐC THỜI GIAN QUAN TRỌNG</h2>
+
+    <div class="timeline-wrap" style="margin-top:20px;">
+      <div class="timeline-left">
+        <div class="title">ĐĂNG KÝ NHẬN VÉ ONLINE</div>
+        <div>02.09.2025</div>
+      </div>
+      <div class="tcard">
+        <div class="time">14:00 PM — MỞ ĐĂNG KÝ 2000 VÉ ONLINE</div>
+        <ul>
+          <li>Điền đầy đủ thông tin để đăng ký vé. Hệ thống dừng khi phát hết số lượng.</li>
+          <li>Danh sách đăng ký thành công được công bố trên website, kèm tên và CCCD che 4 số cuối.</li>
+          <li>Vé online gửi qua email. Mỗi vé có mã code riêng cho 01 người dùng.</li>
+          <li>Khi đến sự kiện, vui lòng mang CCCD/VNeID mở từ app để qua cửa an ninh.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="timeline-wrap" style="margin-top:26px;">
+      <div class="timeline-left">
+        <div class="title">LIVE CONCERT: ĐÊM NHẠC ROCK</div>
+        <div>07.09.2025</div>
+      </div>
+      <div class="tcard">
+        <div class="time">16:00 PM — CHECK-IN</div>
+        <ul><li>Bắt đầu check-in vé.</li></ul>
+        <div class="time" style="margin-top:10px;">20:00 PM — BẮT ĐẦU SHOW</div>
+        <ul><li>Thưởng thức đêm nhạc rock bùng nổ!</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== REGISTER ===== -->
+  <section id="register" class="section">
+    <h2 style="text-align:center">ĐĂNG KÝ VÉ</h2>
+
+    <!-- Step 1 -->
+    <div id="step-register" class="block">
+      <div id="form-toast" class="toast"></div>
+
+      <h3 style="margin-top:0;">Chọn loại vé</h3>
+      <div id="tickets" class="tickets"></div>
+
+      <!-- Server notice (ẩn mặc định) -->
+      <div id="server-msg" class="server-msg hidden"></div>
+
+      <div class="form">
+        <div class="field full" id="f-fullname">
+          <label for="fullname">Họ và tên</label>
+          <input id="fullname" type="text" placeholder="Nguyễn Văn A" />
+          <small class="err">Vui lòng nhập họ và tên (tối thiểu 2 ký tự).</small>
+        </div>
+        <div class="field" id="f-dob">
+          <label for="dob">Ngày sinh</label>
+          <input id="dob" type="date" />
+          <small class="err">Vui lòng chọn ngày sinh.</small>
+        </div>
+        <div class="field" id="f-cccd">
+          <label for="cccd">CCCD</label>
+          <input id="cccd" type="text" placeholder="012345678901" />
+          <small class="err">CCCD phải là 9 hoặc 12 số.</small>
+        </div>
+        <div class="field full" id="f-email">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="email@domain.com" />
+          <small class="err">Email không hợp lệ.</small>
+        </div>
+        <div class="full">
+          <button id="btn-reserve" class="btn-primary" onclick="reserveTicket()">Đặt vé</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div id="step-payment" class="block hidden center">
+      <h3>Thanh toán</h3>
+      <div class="order-badge" id="order-id"></div>
+      <div style="margin-top:10px;color:#aeb2c9">Đơn hàng đang ở trạng thái <b>pending</b>.</div>
+      <div class="server-actions" style="justify-content:center; margin-top:14px;">
+        <button class="btn-pay" onclick="makePayment()">💳 Thanh toán ngay</button>
+        <button class="btn-ghost" onclick="location.reload()">Đặt lại</button>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div id="step-result" class="block hidden">
+      <div id="result-box"></div>
+      <div class="server-actions" style="justify-content:center; margin-top:16px;">
+        <button class="btn-primary" onclick="window.location.reload()">Quay lại trang chủ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== LIÊN HỆ ===== -->
+  <section id="contact" class="section">
+    <div class="contact-wrap">
+      <div class="contact-left">
+        <h3>LIÊN HỆ — THÔNG TIN SỰ KIỆN</h3>
+        <p>Nếu bạn có thắc mắc về dịch vụ hoặc muốn hợp tác, vui lòng để lại thông tin. Chúng tôi sẽ phản hồi sớm nhất.</p>
+        <div style="margin-top:18px;">
+          <input class="contact-input" placeholder="Nội dung ..." style="margin-bottom:12px;">
+          <input class="contact-input" placeholder="Email">
+        </div>
+      </div>
+      <div class="contact-right">
+        <h3>ĐỊA ĐIỂM</h3>
+        <div class="map-card">
+          <div class="map-thumb"></div>
+          <div class="map-overlay">
+            <div style="font-weight:800;">Hoàng Thành Thăng Long</div>
+            <small>19C Hoàng Diệu, Điện Biên, Ba Đình, Hà Nội</small><br>
+            <a class="btn-road" target="_blank" href="https://maps.google.com/?q=19C+Ho%C3%A0ng+Di%E1%BB%87u,+Ba+%C4%90%C3%ACnh,+H%C3%A0+N%E1%BB%99i">Tìm đường →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>© 2025 Concert Organizer. All rights reserved.</footer>
+
+  <script>
+    const API_BASE = "https://jyv6dmhcc7.execute-api.us-east-1.amazonaws.com/prd";
+    let currentOrderId = null;
+
+    // Smooth scroll offset (không bị che bởi header)
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const id = a.getAttribute('href');
+        if (!id || id === '#') return;
+        const el = document.querySelector(id);
+        if (!el) return;
+        e.preventDefault();
+        const headerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 68;
+        const top = el.getBoundingClientRect().top + window.pageYOffset - (headerH + 12);
+        window.scrollTo({ top, behavior: 'smooth' });
+      });
+    });
+
+    /* ============== Tickets ============== */
+    function setActive(inputEl) {
+      document.querySelectorAll('.ticket').forEach(c => c.classList.remove('active'));
+      if (inputEl) inputEl.closest('.ticket').classList.add('active');
+    }
+
+    async function loadTickets() {
+      try {
+        const r = await fetch(`${API_BASE}/tickets`);
+        const tickets = await r.json();
+        const wrap = document.getElementById('tickets');
+        wrap.innerHTML = '';
+        tickets.forEach((t, idx) => {
+          const label = document.createElement('label');
+          label.className = 'ticket';
+          label.innerHTML = `
+            <input type="radio" name="ticket" value="${t.ticket_type}" ${idx===0 ? 'checked' : ''}>
+            <h3>${t.ticket_type}</h3>
+            <div class="muted">💰 ${Number(t.price).toLocaleString('vi-VN')} VND</div>
+            <div class="muted">🎟️ ${t.remaining_quantity}/${t.total_quantity} còn lại</div>
+          `;
+          wrap.appendChild(label);
+        });
+        const radios = wrap.querySelectorAll('input[name="ticket"]');
+        radios.forEach(r => r.addEventListener('change', () => setActive(r)));
+        if (radios[0]) setActive(radios[0]);
+      } catch (e) {
+        showToast('Không tải được danh sách vé. Vui lòng thử lại.', true);
+      }
+    }
+
+    /* ============== Validation ============== */
+    const $ = (id) => document.getElementById(id);
+    const fields = {
+      name:   { wrap: 'f-fullname', input: 'fullname', check: v => v.trim().length >= 2 },
+      dob:    { wrap: 'f-dob',      input: 'dob',      check: v => !!v },
+      cccd:   { wrap: 'f-cccd',     input: 'cccd',     check: v => /^\d{9}$/.test(v) || /^\d{12}$/.test(v) },
+      email:  { wrap: 'f-email',    input: 'email',    check: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+    };
+
+    function invalidate(fieldWrapId, on) {
+      const el = $(fieldWrapId);
+      if (!el) return;
+      if (on) el.classList.add('invalid'); else el.classList.remove('invalid');
+    }
+
+    function validateForm() {
+      let ok = true;
+      const name  = $(fields.name.input).value.trim();
+      const dob   = $(fields.dob.input).value.trim();
+      const cccd  = $(fields.cccd.input).value.replace(/\s+/g,'');
+      const email = $(fields.email.input).value.trim();
+
+      const vName  = fields.name.check(name);
+      const vDob   = fields.dob.check(dob);
+      const vCccd  = fields.cccd.check(cccd);
+      const vEmail = fields.email.check(email);
+
+      invalidate(fields.name.wrap,  !vName);  ok = ok && vName;
+      invalidate(fields.dob.wrap,   !vDob);   ok = ok && vDob;
+      invalidate(fields.cccd.wrap,  !vCccd);  ok = ok && vCccd;
+      invalidate(fields.email.wrap, !vEmail); ok = ok && vEmail;
+
+      return { ok, values: { name, dob, cccd, email } };
+    }
+
+    // Realtime inline validation
+    Object.values(fields).forEach(f => {
+      const input = $(f.input);
+      if (!input) return;
+      input.addEventListener('input', () => {
+        const val = f.input === 'cccd' ? input.value.replace(/\s+/g,'') : input.value.trim();
+        invalidate(f.wrap, !f.check(val));
+      });
+      input.addEventListener('blur', () => {
+        const val = f.input === 'cccd' ? input.value.replace(/\s+/g,'') : input.value.trim();
+        invalidate(f.wrap, !f.check(val));
+      });
+    });
+
+    function showToast(text, isError=false) {
+      const t = $('form-toast');
+      t.className = 'toast ' + (isError ? 'err' : 'ok');
+      t.textContent = text;
+    }
+    function clearToast() {
+      const t = $('form-toast');
+      t.className = 'toast'; t.textContent = '';
+    }
+
+    /* ============== Reserve ============== */
+    async function reserveTicket() {
+      clearToast();
+      $('server-msg').classList.add('hidden');
+
+      const { ok, values } = validateForm();
+      if (!ok) { showToast('Vui lòng kiểm tra lại các trường được tô đỏ.', true); return; }
+
+      const checked = document.querySelector('input[name="ticket"]:checked');
+      if (!checked) { showToast('Vui lòng chọn loại vé.', true); return; }
+
+      const btn = $('btn-reserve');
+      btn.disabled = true; const oldLabel = btn.textContent; btn.textContent = 'Đang xử lý...';
+
+      try {
+        const payload = {
+          email: values.email.trim(),
+          ticket_type: checked.value,
+          full_name: values.name.trim(),
+          dob: values.dob,
+          cccd: values.cccd.trim()
+        };
+
+        const res = await fetch(`${API_BASE}/reserve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.order_id) {
+          currentOrderId = data.order_id;
+          $('order-id').innerText = currentOrderId;
+          $('step-register').classList.add('hidden');
+          $('step-payment').classList.remove('hidden');
+          smoothTo('step-payment');
+          return;
+        }
+
+        if (data.error && data.current_order) {
+          const box = $('server-msg');
+          box.innerHTML = `
+            <h4>⚠️ Email đã có đơn chờ thanh toán</h4>
+            <div class="dim">Bạn đã đặt 1 đơn trước đó. Bạn có thể tiếp tục thanh toán đơn đang chờ.</div>
+            <div style="margin-top:8px;"><b>Order ID:</b> <code>${data.current_order.order_id}</code></div>
+            <div style="margin-top:2px;"><b>Loại vé:</b> ${data.current_order.ticket_type} — <b>Trạng thái:</b> ${data.current_order.status}</div>
+            <div class="server-actions">
+              <button class="btn-pay" id="btn-continue">Tiếp tục thanh toán</button>
+              <button class="btn-ghost" id="btn-change">Dùng email khác</button>
+            </div>
+          `;
+          box.classList.remove('hidden');
+
+          $('btn-continue').onclick = () => {
+            currentOrderId = data.current_order.order_id;
+            $('order-id').innerText = currentOrderId;
+            $('step-register').classList.add('hidden');
+            $('step-payment').classList.remove('hidden');
+            smoothTo('step-payment');
+          };
+          $('btn-change').onclick = () => {
+            $('server-msg').classList.add('hidden');
+            $('email').focus();
+          };
+
+          showToast('Email đã có đơn chờ. Bạn có thể tiếp tục thanh toán.', true);
+          return;
+        }
+
+        showToast(data.error || 'Đặt vé thất bại. Vui lòng thử lại.', true);
+
+      } catch (e) {
+        showToast('Không thể kết nối máy chủ. Vui lòng thử lại.', true);
+      } finally {
+        btn.disabled = false; btn.textContent = oldLabel;
+      }
+    }
+
+    /* ============== Payment (đÃ CẬP NHẬT HIỂN THỊ) ============== */
+    function maskCccd(s) {
+      if (!s) return '-';
+      return s.replace(/\d(?=\d{4})/g, '•');
+    }
+    function fmtDate(v) {
+      if (!v) return '-';
+      const d = new Date(v);
+      if (!isNaN(d)) return d.toLocaleString('vi-VN');
+      // fallback nếu FE gửi yyyy-mm-dd string (không timezone)
+      return v;
+    }
+
+    async function makePayment() {
+      try {
+        const res = await fetch(`${API_BASE}/payment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_id: currentOrderId })
+        });
+        const data = await res.json();
+
+        const box = $('result-box');
+        if (data.status === 'paid') {
+          box.innerHTML = `
+            <div class="center">
+              <div class="status-icon">✅</div>
+              <h3 class="ok">Thanh toán thành công!</h3>
+            </div>
+            <div class="info">
+              <div class="row"><strong>Mã đơn hàng:</strong><span>${data.order_id}</span></div>
+              <div class="row"><strong>Email:</strong><span>${data.email}</span></div>
+              <div class="row"><strong>Họ & tên:</strong><span>${data.full_name || '-'}</span></div>
+              <div class="row"><strong>Ngày sinh:</strong><span>${data.dob ? new Date(data.dob).toLocaleDateString('vi-VN') : '-'}</span></div>
+              <div class="row"><strong>CCCD:</strong><span>${maskCccd(data.cccd)}</span></div>
+              <div class="row"><strong>Loại vé:</strong><span>${data.ticket_type}</span></div>
+              <div class="row"><strong>Số lượng:</strong><span>${data.quantity}</span></div>
+              <div class="row"><strong>Trạng thái:</strong><span class="ok">${data.status}</span></div>
+              <div class="row"><strong>Mã thanh toán:</strong><span>${data.payment_id}</span></div>
+              <div class="row"><strong>Thời gian:</strong><span>${fmtDate(data.created_at)}</span></div>
+            </div>`;
+        } else {
+          box.innerHTML = `
+            <div class="center">
+              <div class="status-icon">❌</div>
+              <h3 class="bad">Thanh toán thất bại!</h3>
+              <p class="center">${data.error || "Đã có lỗi xảy ra. Vui lòng thử lại."}</p>
+            </div>`;
+        }
+
+        $('step-payment').classList.add('hidden');
+        $('step-result').classList.remove('hidden');
+        smoothTo('step-result');
+
+      } catch (e) {
+        showToast('Không thể thanh toán lúc này. Vui lòng thử lại.', true);
+      }
+    }
+
+    function smoothTo(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const headerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 68;
+      const top = el.getBoundingClientRect().top + window.pageYOffset - (headerH + 12);
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
+
+    // Init
+    loadTickets();
+  </script>
+</body>
+</html>
