@@ -1,147 +1,104 @@
-// reserveTicket.js
+// reserveWorker.js
 import {
   DynamoDBClient,
   QueryCommand,
   UpdateItemCommand,
   PutItemCommand,
 } from "@aws-sdk/client-dynamodb";
-import crypto from "crypto";
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
-
 const TABLE_ORDERS  = process.env.TABLE_ORDERS  || "cc-prd-dynamo-orders-table";
 const TABLE_TICKETS = process.env.TABLE_TICKETS || "cc-prd-dynamo-tickets-table";
 const GSI_EMAIL     = process.env.GSI_EMAIL     || "email_index";
 
-const headers = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "OPTIONS,POST",
-  "Content-Type": "application/json",
-};
-const resp = (status, body) => ({ statusCode: status, headers, body: JSON.stringify(body) });
-
 export const handler = async (event = {}) => {
-  // CORS preflight
-  if (event.httpMethod === "OPTIONS") return resp(200, {});
-  if (event.httpMethod && event.httpMethod !== "POST") return resp(405, { error: "MethodNotAllowed" });
+  console.log("SQS Event:", JSON.stringify(event));
 
-  // Log thô để debug mapping
-  console.log("RAW EVENT:", JSON.stringify({
-    httpMethod: event.httpMethod,
-    path: event.path,
-    body: event.body
-  }));
-
-  // Parse body
-  let body = {};
-  try { body = JSON.parse(event.body || "{}"); }
-  catch { return resp(400, { error: "InvalidJSON" }); }
-
-  // Chuẩn hóa & validate
-  const email       = String(body.email || "").trim().toLowerCase();
-  const ticket_type = String(body.ticket_type || "").trim();
-
-  const full_name = String(body.full_name || body.fullname || body.name || "").trim();
-  const dob       = String(body.dob || body.date_of_birth || "").trim();      // 'YYYY-MM-DD'
-  const cccd_raw  = String(body.cccd || body.national_id || "").replace(/\s+/g, "");
-
-  const errors = {};
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))              errors.email = "Email không hợp lệ.";
-  if (!ticket_type)                                           errors.ticket_type = "Thiếu loại vé.";
-  if (full_name.length < 2)                                   errors.full_name = "Họ tên tối thiểu 2 ký tự.";
-  if (!dob || isNaN(Date.parse(dob)))                         errors.dob = "Ngày sinh không hợp lệ (YYYY-MM-DD).";
-  if (!/^\d{9}$/.test(cccd_raw) && !/^\d{12}$/.test(cccd_raw)) errors.cccd = "CCCD phải gồm 9 hoặc 12 số.";
-
-  if (Object.keys(errors).length) return resp(400, { error: "ValidationError", errors });
-
-  // Log payload đã chuẩn hóa (để xác nhận Lambda nhận đủ trường)
-  console.log("PARSED BODY:", { email, ticket_type, full_name, dob, cccd_raw });
-
-  try {
-    // 1) Check email: nếu đã có đơn PENDING thì từ chối (DynamoDB GSI email_index)
-    const q = await client.send(new QueryCommand({
-      TableName: TABLE_ORDERS,
-      IndexName: GSI_EMAIL,
-      KeyConditionExpression: "email = :e",
-      ExpressionAttributeValues: { ":e": { S: email } },
-      Limit: 25,
-    }));
-
-    if ((q.Items || []).length) {
-      // Ưu tiên pending
-      const pending = q.Items.find(i => (i.status?.S || "").toLowerCase() === "pending");
-      const any = pending || q.Items[0];
-      if (any) {
-        return resp(409, {
-          error: pending ? "Email đã được mua vé" : "Email đã có đơn hàng",
-          current_order: {
-            order_id: any.order_id?.S,
-            status: any.status?.S,
-            ticket_type: any.ticket_type?.S,
-            full_name: any.full_name?.S,
-            dob: any.dob?.S,
-            cccd: any.cccd?.S,
-          },
-        });
-      }
-    }
-
-    // 2) Giảm tồn vé (atomic)
-    await client.send(new UpdateItemCommand({
-      TableName: TABLE_TICKETS,
-      Key: { ticket_type: { S: ticket_type } },
-      UpdateExpression: "SET remaining_quantity = remaining_quantity - :q",
-      ConditionExpression: "remaining_quantity >= :q",
-      ExpressionAttributeValues: { ":q": { N: "1" } },
-      ReturnValues: "UPDATED_NEW",
-    }));
-
-    // 3) Tạo order (PutItem đủ trường)
-    const order_id   = crypto.randomUUID();
-    const created_at = new Date().toISOString();
+  for (const record of event.Records) {
+    const body = JSON.parse(record.body);
+    const {
+      order_id,
+      created_at,
+      email,
+      ticket_type,
+      quantity,
+      status,
+      full_name,
+      dob,
+      cccd,
+    } = body;
 
     try {
-      await client.send(new PutItemCommand({
-        TableName: TABLE_ORDERS,
-        Item: {
-          order_id:    { S: order_id },
-          created_at:  { S: created_at },
-          email:       { S: email },
-          ticket_type: { S: ticket_type },
-          quantity:    { N: "1" },
-          status:      { S: "pending" },
-          payment_id:  { NULL: true },
+      // 1) Check email (nếu có đơn pending thì từ chối)
+      const q = await client.send(
+        new QueryCommand({
+          TableName: TABLE_ORDERS,
+          IndexName: GSI_EMAIL,
+          KeyConditionExpression: "email = :e",
+          ExpressionAttributeValues: { ":e": { S: email } },
+          Limit: 25,
+        })
+      );
 
-          // 3 trường mới
-          full_name:   { S: full_name },
-          dob:         { S: dob },
-          cccd:        { S: cccd_raw },
-        },
-        ConditionExpression: "attribute_not_exists(order_id)",
-      }));
-    } catch (putErr) {
-      // Rollback tồn vé nếu PutItem thất bại
-      console.error("PutItem failed, rollback ticket stock:", putErr);
-      try {
-        await client.send(new UpdateItemCommand({
+      const existing = (q.Items || []).find(
+        (i) => (i.status?.S || "").toLowerCase() === "pending"
+      );
+      if (existing) {
+        console.warn(`❌ Email ${email} đã có đơn pending, bỏ qua.`);
+        continue; // bỏ qua order này
+      }
+
+      // 2) Giảm tồn vé (atomic)
+      await client.send(
+        new UpdateItemCommand({
           TableName: TABLE_TICKETS,
           Key: { ticket_type: { S: ticket_type } },
-          UpdateExpression: "SET remaining_quantity = remaining_quantity + :q",
-          ExpressionAttributeValues: { ":q": { N: "1" } },
-        }));
-      } catch (rbErr) {
-        console.error("Rollback ticket stock failed:", rbErr);
-      }
-      throw putErr;
-    }
+          UpdateExpression: "SET remaining_quantity = remaining_quantity - :q",
+          ConditionExpression: "remaining_quantity >= :q",
+          ExpressionAttributeValues: { ":q": { N: String(quantity) } },
+        })
+      );
 
-    return resp(200, { message: "Order created", order_id, status: "pending" });
-  } catch (err) {
-    if (err.name === "ConditionalCheckFailedException") {
-      return resp(409, { error: "Hết vé hoặc không đủ số lượng." });
+      // 3) Tạo order
+      await client.send(
+        new PutItemCommand({
+          TableName: TABLE_ORDERS,
+          Item: {
+            order_id:    { S: order_id },
+            created_at:  { S: created_at },
+            email:       { S: email },
+            ticket_type: { S: ticket_type },
+            quantity:    { N: String(quantity) },
+            status:      { S: status },
+            payment_id:  { NULL: true },
+            full_name:   { S: full_name },
+            dob:         { S: dob },
+            cccd:        { S: cccd },
+          },
+          ConditionExpression: "attribute_not_exists(order_id)",
+        })
+      );
+
+      console.log(`✅ Order ${order_id} confirmed`);
+    } catch (err) {
+      console.error(`❌ Lỗi khi xử lý order ${order_id}:`, err);
+
+      // Rollback vé nếu PutItem thất bại
+      if (err.name !== "ConditionalCheckFailedException") {
+        try {
+          await client.send(
+            new UpdateItemCommand({
+              TableName: TABLE_TICKETS,
+              Key: { ticket_type: { S: ticket_type } },
+              UpdateExpression: "SET remaining_quantity = remaining_quantity + :q",
+              ExpressionAttributeValues: { ":q": { N: String(quantity) } },
+            })
+          );
+          console.log(`Rollback stock for ticket_type ${ticket_type}`);
+        } catch (rbErr) {
+          console.error("Rollback failed:", rbErr);
+        }
+      }
     }
-    console.error("Reserve error:", err);
-    return resp(500, { error: "InternalError", detail: err.message });
   }
 };
