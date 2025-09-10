@@ -1,0 +1,41 @@
+// file: listPublicTickets.js
+import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
+
+const client = new DynamoDBClient({ region: "us-east-1" });
+
+export const handler = async () => {
+  try {
+    // 1. Scan bảng Tickets
+    const result = await client.send(
+      new ScanCommand({
+        TableName: "cc-prd-dynamo-tickets-table"
+      })
+    );
+
+    // 2. Chuyển dữ liệu sang JSON gọn gàng
+    const tickets = result.Items.map(item => ({
+      ticket_type: item.ticket_type.S,
+      price: Number(item.price.N),
+      total_quantity: Number(item.total_quantity.N),
+      remaining_quantity: Number(item.remaining_quantity.N)
+    }));
+
+    // 3. Trả về response
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",   // Cho phép mọi domain
+        "Access-Control-Allow-Headers": "*",  // Cho phép mọi header
+        "Access-Control-Allow-Methods": "OPTIONS,GET,POST" // Cho phép method
+      },
+      body: JSON.stringify(tickets)
+    };
+
+  } catch (err) {
+    console.error("Error listing tickets:", err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Internal Server Error" })
+    };
+  }
+};
