@@ -1,0 +1,150 @@
+// file: payment.js
+import {
+  DynamoDBClient,
+  GetItemCommand,
+  UpdateItemCommand,
+} from "@aws-sdk/client-dynamodb";
+import crypto from "crypto";
+
+const client = new DynamoDBClient({
+  region: process.env.AWS_REGION || "us-east-1",
+});
+
+const TABLE_ORDERS = process.env.TABLE_ORDERS || "cc-prd-dynamo-orders-table";
+
+const headers = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "OPTIONS,POST",
+  "Content-Type": "application/json",
+};
+
+const resp = (statusCode, body) => ({
+  statusCode,
+  headers,
+  body: JSON.stringify(body),
+});
+
+// helpers đọc AttributeValue an toàn
+const s  = (x) => (x && x.S !== undefined ? x.S : undefined);
+const n  = (x) => (x && x.N !== undefined ? Number(x.N) : undefined);
+
+export const handler = async (event = {}) => {
+  try {
+    // CORS preflight
+    if (event.httpMethod === "OPTIONS") return resp(200, {});
+    if (event.httpMethod && event.httpMethod !== "POST") {
+      return resp(405, { error: "MethodNotAllowed" });
+    }
+
+    // Parse body
+    let body = {};
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch {
+      return resp(400, { error: "InvalidJSON" });
+    }
+
+    const order_id = String(body.order_id || "").trim();
+    const incomingPaymentId = body.payment_id
+      ? String(body.payment_id).trim()
+      : null;
+
+    if (!order_id) return resp(400, { error: "Missing order_id" });
+
+    // 1) Kiểm tra order tồn tại
+    const g = await client.send(
+      new GetItemCommand({
+        TableName: TABLE_ORDERS,
+        Key: { order_id: { S: order_id } },
+      })
+    );
+    if (!g.Item) return resp(404, { error: "OrderNotFound" });
+
+    const currentStatus = s(g.Item.status)?.toLowerCase();
+
+    // Nếu đã paid thì trả về luôn dữ liệu hiện tại (idempotent)
+    if (currentStatus === "paid") {
+      return resp(200, {
+        order_id: s(g.Item.order_id),
+        created_at: s(g.Item.created_at),
+        email: s(g.Item.email),
+        ticket_type: s(g.Item.ticket_type),
+        quantity: n(g.Item.quantity) ?? 1,
+        status: s(g.Item.status),
+        payment_id: s(g.Item.payment_id) ?? incomingPaymentId ?? null,
+        full_name: s(g.Item.full_name) ?? null,
+        dob: s(g.Item.dob) ?? null,
+        cccd: s(g.Item.cccd) ?? null,
+      });
+    }
+
+    // 2) Tạo payment_id nếu chưa có, chỉ cho phép update khi đang pending
+    const finalPaymentId = incomingPaymentId || `PAY-${crypto.randomUUID()}`;
+
+    let updated;
+    try {
+      const upd = await client.send(
+        new UpdateItemCommand({
+          TableName: TABLE_ORDERS,
+          Key: { order_id: { S: order_id } },
+          UpdateExpression: "SET #s = :paid, payment_id = :pid",
+          ConditionExpression: "#s = :pending", // chống double-spend
+          ExpressionAttributeNames: { "#s": "status" },
+          ExpressionAttributeValues: {
+            ":paid": { S: "paid" },
+            ":pending": { S: "pending" },
+            ":pid": { S: finalPaymentId },
+          },
+          ReturnValues: "ALL_NEW",
+        })
+      );
+      updated = upd.Attributes;
+    } catch (err) {
+      // Nếu condition fail vì không còn pending, trả lại trạng thái hiện tại
+      if (err.name === "ConditionalCheckFailedException") {
+        const g2 = await client.send(
+          new GetItemCommand({
+            TableName: TABLE_ORDERS,
+            Key: { order_id: { S: order_id } },
+          })
+        );
+        const it = g2.Item || {};
+        return resp(409, {
+          error: "OrderAlreadyProcessed",
+          order: {
+            order_id: s(it.order_id),
+            created_at: s(it.created_at),
+            email: s(it.email),
+            ticket_type: s(it.ticket_type),
+            quantity: n(it.quantity) ?? 1,
+            status: s(it.status),
+            payment_id: s(it.payment_id) ?? null,
+            full_name: s(it.full_name) ?? null,
+            dob: s(it.dob) ?? null,
+            cccd: s(it.cccd) ?? null,
+          },
+        });
+      }
+      throw err;
+    }
+
+    // 3) Trả về đầy đủ trường (kể cả full_name/dob/cccd)
+    return resp(200, {
+      order_id: s(updated.order_id),
+      created_at: s(updated.created_at),
+      email: s(updated.email),
+      ticket_type: s(updated.ticket_type),
+      quantity: n(updated.quantity) ?? 1,
+      status: s(updated.status),
+      payment_id: s(updated.payment_id),
+
+      full_name: s(updated.full_name) ?? null,
+      dob: s(updated.dob) ?? null,
+      cccd: s(updated.cccd) ?? null,
+    });
+  } catch (err) {
+    console.error("Payment error:", err);
+    return resp(500, { error: "InternalServerError", detail: err.message });
+  }
+};
